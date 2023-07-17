@@ -55,25 +55,48 @@ def display_picked_deliveries_by_year_and_month_and_cluster(dataframe):
 
 
 def display_picklist_duration_per_cluster(dataframe):
-    picklist_duration_by_cluster = dataframe.groupby(['Cluster'])['Picklistendauer'].mean().reset_index()
+    picklist_duration_by_cluster = dataframe.groupby('Cluster').agg({'Picklistendauer': 'mean',
+                                                                     'Packdauer': 'mean'}).reset_index()
 
-    x = picklist_duration_by_cluster['Cluster'].to_list()
-    plist = picklist_duration_by_cluster['Picklistendauer'].tolist()
-    y = [(p.seconds//60) % 60 for p in plist]
+    cluster = picklist_duration_by_cluster['Cluster'].to_list()
+    pick_durations = picklist_duration_by_cluster['Picklistendauer'].tolist()
+    pick_durations = [(p.seconds//60) for p in pick_durations]
+    pack_durations = picklist_duration_by_cluster['Packdauer'].tolist()
+    pack_durations = [(p.seconds//60) for p in pack_durations]
+    durations = {
+        'Pickdauer': pick_durations,
+        'Packdauer': pack_durations
+    }
 
-    plt.bar(x, y)
-    plt.xlabel("Cluster")
-    plt.ylabel("Picklistendauer in Minuten")
-    plt.title("Picklistendauer pro Cluster")
+    width = 0.25
+    multiplier = 0
+    x = np.arange(len(cluster))
+    fig, ax = plt.subplots(layout='constrained')
+
+    for type_of_duration, durations in durations.items():
+        offset = width * multiplier + width/2
+        rects = ax.bar(x + offset, durations, width, label=type_of_duration)
+        ax.bar_label(rects)
+        multiplier += 1
+
+    ax.set_ylabel('Dauer in Minuten')
+    ax.set_xlabel('Cluster')
+    ax.set_title(f'Pick- und Packdauer pro Pickliste im Durchschnitt aus {len(dataframe)} Picklisten')
+    ax.set_xticks(x + width, cluster)
+    ax.legend(loc='upper left')
     plt.show()
 
 
 def display_duration_per_picked_delivery_per_cluster(dataframe):
-    dataframe = dataframe.groupby(['PicklistenID', 'Cluster', 'Picklistendauer'])['PaketNr'].nunique().reset_index()
+    dataframe = dataframe.groupby(['PicklistenID', 'Cluster', 'Picklistendauer', 'Packdauer'])['PaketNr'].nunique().reset_index()
     dataframe = dataframe.rename(columns={'PaketNr': 'PickedDeliveries'})
     dataframe = dataframe.groupby('Cluster').agg({'PickedDeliveries': 'mean',
-                                                  'Picklistendauer': 'mean'})
+                                                  'Picklistendauer': 'mean',
+                                                  'Packdauer': 'mean'})
+
     dataframe['DauerProGepickteDelivery'] = dataframe['Picklistendauer'] / dataframe['PickedDeliveries']
+    dataframe['DauerProGepackteDelivery'] = dataframe['Packdauer'] / dataframe['PickedDeliveries']
+    test = 0
 
 
 dataframe_picklisten_raw = pd.read_csv('Picklisten.csv')
@@ -101,10 +124,13 @@ dataframe_picklisten_positionen.loc[:, 'Packzeit'] = pd.to_datetime(dataframe_pi
 # PufferschieneTime: packagepicklist-to-pufferschiene/{PicklistenID}, wenn Pickliste auf Pufferscheine gebucht wird
 
 # NUR datensätze betrachten, welche ALLE Zeiten enthalten
+dataframe_picklisten_positionen = dataframe_picklisten_positionen.dropna(subset=['Pickzeit', 'Packzeit'])
+
 dataframe_picklisten = dataframe_picklisten.dropna(subset=['Erstellungsdatum', 'FinishedTime', 'inProcessTime', 'PufferschieneTime'])
 dataframe_picklisten['Picklistendauer'] = dataframe_picklisten['PufferschieneTime'] - dataframe_picklisten['Erstellungsdatum']
 
-dataframe_picklisten_positionen = dataframe_picklisten_positionen.dropna(subset=['Pickzeit', 'Packzeit'])
+packdauer = dataframe_picklisten_positionen.groupby('PicklistenID')['Packzeit'].apply(lambda x: x.max() - x.min())
+dataframe_picklisten['Packdauer'] = dataframe_picklisten['PicklistenID'].map(packdauer)
 
 joined_dataframe = pd.merge(dataframe_picklisten, dataframe_picklisten_positionen, on=['PicklistenID']).sort_values(by='PicklistenPositionenID')
 
@@ -119,7 +145,7 @@ joined_dataframe['Day'] = pd.DatetimeIndex(joined_dataframe['Erstellungsdatum'])
 # display_picked_deliveries_by_year_and_month_and_cluster(joined_dataframe)
 
 # Wie lange dauert im Durchschnitt eine Pickliste pro Cluster
-# display_picklist_duration_per_cluster(joined_dataframe)
+# display_picklist_duration_per_cluster(dataframe_picklisten)
 
 # Wie lange braucht ein Picker pro Lieferung in einem Cluster --> Dauer der Picklisten teilen durch Anzahl Lieferungen in Pickliste pro Cluster
 # Wie viele Lieferungen enthält eine Pickliste pro Cluster
