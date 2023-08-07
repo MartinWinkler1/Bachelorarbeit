@@ -3,18 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def display_picked_positions_by_year_and_month(dataframe):
-    picked_positions_by_year_and_month = dataframe.groupby(['Year', 'Month'])['PicklistenPositionenID'].count().reset_index()
-    picked_positions_by_year_and_month = picked_positions_by_year_and_month.rename(columns={'PicklistenPositionenID': 'PickedPositions'})
+def display_picked_deliveries_by_year_and_month(dataframe):
+    picked_positions_by_year_and_month = dataframe.groupby(['Year', 'Month'])['PaketNr'].nunique().reset_index()
+    picked_positions_by_year_and_month = picked_positions_by_year_and_month.rename(columns={'PaketNr': 'PickedDeliveries'})
     picked_positions_by_year_and_month['YearAndMonth'] = picked_positions_by_year_and_month['Year'].astype(str) + '-' + picked_positions_by_year_and_month['Month'].astype(str)
 
     x = picked_positions_by_year_and_month['YearAndMonth'].to_list()
-    y = picked_positions_by_year_and_month['PickedPositions'].to_list()
+    y = picked_positions_by_year_and_month['PickedDeliveries'].to_list()
 
     plt.bar(x, y)
     plt.xlabel("Monat und Jahr")
-    plt.ylabel("Gepickte Positionen")
-    plt.title("Gepickte Positionen pro Monat und Jahr")
+    plt.ylabel("Gepickte Lieferungen")
+    plt.title("Gepickte Lieferungen pro Monat und Jahr")
     plt.show()
 
 
@@ -48,7 +48,47 @@ def display_picked_deliveries_by_year_and_month_and_cluster(dataframe):
         bottom += cluster_count
         ax.bar_label(p, label_type='center')
 
-    ax.set_title("Number of Picked Deliveries by Year, Month and Cluster")
+    ax.set_ylabel('Gepickte Lieferungen')
+    ax.set_xlabel('Jahr und Monat')
+    ax.set_title('Anzahl der gepickten Lieferungen pro Jahr und Monat')
+    ax.legend(loc="upper center")
+
+    plt.show()
+
+
+def display_picked_articles_by_year_and_month_and_cluster(dataframe):
+    picked_deliveries_by_year_and_month_and_cluster = dataframe.groupby(['Year', 'Month', 'Cluster'])['Menge'].sum().reset_index()
+    picked_deliveries_by_year_and_month_and_cluster = picked_deliveries_by_year_and_month_and_cluster.rename(columns={'Menge': 'PickedArticles'})
+    picked_deliveries_by_year_and_month_and_cluster['YearAndMonth'] = picked_deliveries_by_year_and_month_and_cluster['Year'].astype(str) + '-' + picked_deliveries_by_year_and_month_and_cluster['Month'].astype(str)
+
+    months = picked_deliveries_by_year_and_month_and_cluster['YearAndMonth'].unique().tolist()
+
+    cluster_counts = {}
+    c1_values_dataframe = picked_deliveries_by_year_and_month_and_cluster[picked_deliveries_by_year_and_month_and_cluster['Cluster'] == 'C1']
+    cluster_counts['C1'] = np.array(c1_values_dataframe['PickedArticles'])
+
+    c2_values_dataframe = picked_deliveries_by_year_and_month_and_cluster[picked_deliveries_by_year_and_month_and_cluster['Cluster'] == 'C2']
+    cluster_counts['C2'] = np.array(c2_values_dataframe['PickedArticles'])
+
+    c3_values_dataframe = picked_deliveries_by_year_and_month_and_cluster[picked_deliveries_by_year_and_month_and_cluster['Cluster'] == 'C3']
+    cluster_counts['C3'] = np.array(c3_values_dataframe['PickedArticles'])
+
+    oor_values_dataframe = picked_deliveries_by_year_and_month_and_cluster[picked_deliveries_by_year_and_month_and_cluster['Cluster'] == 'OOR']
+    cluster_counts['OOR'] = np.array(oor_values_dataframe['PickedArticles'])
+
+    width = 0.6
+
+    fig, ax = plt.subplots()
+    bottom = np.zeros(len(months))
+
+    for cluster, cluster_count in cluster_counts.items():
+        p = ax.bar(months, cluster_count, width, label=cluster, bottom=bottom)
+        bottom += cluster_count
+        ax.bar_label(p, label_type='center')
+
+    ax.set_ylabel('Gepickte Artikel')
+    ax.set_xlabel('Jahr und Monat')
+    ax.set_title('Anzahl der gepickten Artikel pro Jahr und Monat')
     ax.legend(loc="upper center")
 
     plt.show()
@@ -138,11 +178,14 @@ joined_dataframe['Year'] = pd.DatetimeIndex(joined_dataframe['Erstellungsdatum']
 joined_dataframe['Month'] = pd.DatetimeIndex(joined_dataframe['Erstellungsdatum']).month
 joined_dataframe['Day'] = pd.DatetimeIndex(joined_dataframe['Erstellungsdatum']).day
 
-# Wie viele Positionen werden pro Monat gepickt
-# display_picked_positions_by_year_and_month(joined_dataframe)
+# Wie viele Lieferungen werden pro Monat gepickt
+# display_picked_deliveries_by_year_and_month(joined_dataframe)
 
 # Wie viele Lieferungen werden pro Monat und pro Cluster gepickt
-# display_picked_deliveries_by_year_and_month_and_cluster(joined_dataframe)
+display_picked_deliveries_by_year_and_month_and_cluster(joined_dataframe)
+
+# Wie viele Artikel sind in diesen Lieferungen
+display_picked_articles_by_year_and_month_and_cluster(joined_dataframe)
 
 # Wie lange dauert im Durchschnitt eine Pickliste pro Cluster
 # display_picklist_duration_per_cluster(dataframe_picklisten)
